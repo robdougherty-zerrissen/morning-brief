@@ -3,19 +3,25 @@ const SUPABASE_URL = 'https://oejfkgozxswpvjujbnkg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9lamZrZ296eHN3cHZqdWpibmtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NjUzMjEsImV4cCI6MjA5MzI0MTMyMX0.oyUR0kYcNogW3NF6E98hKFWrk9Ac4HzUwsq89SUSSqQ';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ── External feed URLs (via CORS proxy) ──────────────────────────────────────
+const PROXY = 'https://corsproxy.io/?';
+const NWS_FORECAST_URL = 'https://api.weather.gov/gridpoints/OHX/53,71/forecast';
+const DW_RSS_URL  = 'https://rss.dw.com/rdf/rss-en-ger';
+const ENW_RSS_URL = 'https://www.enworld.org/forums/-/index.rss';
+
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GOAL_WEIGHT = 195;
+const GOAL_WEIGHT  = 195;
 const START_WEIGHT = 225;
 
 const LIFT = [
-  { name: 'Smith machine squat',            detail: '3 × 10 @ 75 lbs',  note: 'Still learning the movement — hold weight' },
-  { name: 'DB chest press',                 detail: 'Pyramid',           note: '8×40 / 8×50 / 8×60 lbs' },
-  { name: 'DB Romanian deadlift',           detail: '3 × 10',            note: 'Form priority — assess after PT eval' },
-  { name: 'Seated cable row',               detail: '3 × 10 @ 110 lbs', note: '' },
-  { name: 'Planks / dead bugs / Pallof press', detail: '3 sets each',   note: 'Dead bugs: fatigue sets in around set 2' },
-  { name: 'Cable triceps pushdown',         detail: '3 × 10 @ 35 lbs',  note: '' },
-  { name: 'DB shoulder press',              detail: 'Pyramid',           note: '8×22.5 / 8×25 / 8×27.5 lbs — stay conservative, old injury' },
-  { name: 'DB bicep curl',                  detail: '3 × 10 @ 25 lbs',  note: 'No 27.5 available — jump to 30 when ready' },
+  { name: 'Smith machine squat',               detail: '3 × 10 @ 75 lbs',  note: 'Still learning the movement — hold weight' },
+  { name: 'DB chest press',                    detail: 'Pyramid',           note: '8×40 / 8×50 / 8×60 lbs' },
+  { name: 'DB Romanian deadlift',              detail: '3 × 10',            note: 'Form priority — assess after PT eval' },
+  { name: 'Seated cable row',                  detail: '3 × 10 @ 110 lbs', note: '' },
+  { name: 'Planks / dead bugs / Pallof press', detail: '3 sets each',       note: 'Dead bugs: fatigue sets in around set 2' },
+  { name: 'Cable triceps pushdown',            detail: '3 × 10 @ 35 lbs',  note: '' },
+  { name: 'DB shoulder press',                 detail: 'Pyramid',           note: '8×22.5 / 8×25 / 8×27.5 lbs — stay conservative, old injury' },
+  { name: 'DB bicep curl',                     detail: '3 × 10 @ 25 lbs',  note: 'No 27.5 available — jump to 30 when ready' },
 ];
 const WALK = [{ name: 'Treadmill walk', detail: '60 min', note: '3% incline · 3.5–3.6 mph' }];
 
@@ -58,15 +64,15 @@ const LICHT_TOTAL = 471;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let weightLog = [];
-let settings = { duolingo_streak: 691, sober_date: '2026-01-11' };
+let settings  = { duolingo_streak: 691, sober_date: '2026-01-11' };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const today = () => new Date().toISOString().slice(0, 10);
+const today     = () => new Date().toISOString().slice(0, 10);
 const daysSince = ds => Math.floor((Date.now() - new Date(ds + 'T12:00:00').getTime()) / 86400000);
-const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-const greeting = () => { const h = new Date().getHours(); return h < 9 ? 'Good morning, Rob.' : h < 12 ? 'Morning, Rob.' : h < 17 ? 'Good afternoon, Rob.' : 'Good evening, Rob.'; };
-const wType = () => { const d = new Date().getDay(); return [2, 4, 6].includes(d) ? 'lift' : d === 0 ? 'rest' : 'walk'; };
-const toC = f => Math.round((f - 32) * 5 / 9);
+const fmtDate   = d  => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+const greeting  = () => { const h = new Date().getHours(); return h < 9 ? 'Good morning, Rob.' : h < 12 ? 'Morning, Rob.' : h < 17 ? 'Good afternoon, Rob.' : 'Good evening, Rob.'; };
+const wType     = () => { const d = new Date().getDay(); return [2, 4, 6].includes(d) ? 'lift' : d === 0 ? 'rest' : 'walk'; };
+const toC       = f  => Math.round((f - 32) * 5 / 9);
 
 // ── Supabase data loading ─────────────────────────────────────────────────────
 async function loadData() {
@@ -80,7 +86,7 @@ async function loadData() {
 
 // ── Workout ───────────────────────────────────────────────────────────────────
 function renderWorkout() {
-  const t = wType();
+  const t  = wType();
   const el = document.getElementById('el-workout');
   if (t === 'rest') {
     el.innerHTML = `<div class="workout-box"><div class="workout-title">Rest day</div><div class="workout-sub">Sunday — full recovery</div></div>`;
@@ -106,27 +112,27 @@ function renderWorkout() {
 function drawChart() {
   if (!weightLog.length) return;
   const latest = weightLog[weightLog.length - 1].value;
-  const pct = Math.round(Math.max(0, Math.min(100, (START_WEIGHT - latest) / (START_WEIGHT - GOAL_WEIGHT) * 100)));
-  document.getElementById('w-current').textContent = latest + ' lbs';
+  const pct    = Math.round(Math.max(0, Math.min(100, (START_WEIGHT - latest) / (START_WEIGHT - GOAL_WEIGHT) * 100)));
+  document.getElementById('w-current').textContent  = latest + ' lbs';
   document.getElementById('w-goal-sub').textContent = `Goal: ${GOAL_WEIGHT} lbs · ${pct}% there`;
-  document.getElementById('w-lost').textContent = (START_WEIGHT - latest).toFixed(1) + ' lbs';
+  document.getElementById('w-lost').textContent     = (START_WEIGHT - latest).toFixed(1) + ' lbs';
 
   const canvas = document.getElementById('wt-chart');
-  const ctx = canvas.getContext('2d');
+  const ctx    = canvas.getContext('2d');
   const W = canvas.offsetWidth || 680, H = 200;
   canvas.width = W; canvas.height = H;
 
   const vals = weightLog.map(e => e.value);
   const minV = Math.min(...vals, GOAL_WEIGHT) - 3;
   const maxV = Math.max(...vals) + 3;
-  const PAD = { l: 42, r: 12, t: 10, b: 26 };
+  const PAD  = { l: 42, r: 12, t: 10, b: 26 };
   const cW = W - PAD.l - PAD.r, cH = H - PAD.t - PAD.b, n = vals.length;
   const xOf = i => PAD.l + i / (n - 1) * cW;
   const yOf = v => PAD.t + cH - (v - minV) / (maxV - minV) * cH;
 
   const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const gridC = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
-  const textC = isDark ? '#68685a' : '#9a9a92';
+  const gridC  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+  const textC  = isDark ? '#68685a' : '#9a9a92';
 
   ctx.clearRect(0, 0, W, H);
   [195, 200, 205, 210, 215, 220, 225].filter(v => v >= minV && v <= maxV).forEach(v => {
@@ -146,23 +152,19 @@ function drawChart() {
     }
   });
 
-  // Goal line
   ctx.beginPath(); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#4a7c1f'; ctx.lineWidth = 1.5;
   ctx.moveTo(xOf(0), yOf(GOAL_WEIGHT)); ctx.lineTo(xOf(n - 1), yOf(GOAL_WEIGHT));
   ctx.stroke(); ctx.setLineDash([]);
 
-  // Fill
   ctx.beginPath(); ctx.moveTo(xOf(0), yOf(vals[0]));
   vals.forEach((v, i) => { if (i > 0) ctx.lineTo(xOf(i), yOf(v)); });
   ctx.lineTo(xOf(n - 1), H - PAD.b); ctx.lineTo(xOf(0), H - PAD.b); ctx.closePath();
   ctx.fillStyle = 'rgba(186,117,23,0.08)'; ctx.fill();
 
-  // Line
   ctx.beginPath(); ctx.strokeStyle = '#BA7517'; ctx.lineWidth = 1.8;
   vals.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
   ctx.stroke();
 
-  // End dots
   [0, n - 1].forEach(i => {
     ctx.beginPath(); ctx.arc(xOf(i), yOf(vals[i]), 3, 0, Math.PI * 2);
     ctx.fillStyle = '#BA7517'; ctx.fill();
@@ -172,17 +174,22 @@ function drawChart() {
 // ── Reading ───────────────────────────────────────────────────────────────────
 function renderReading() {
   const t = today();
+
   const cotEntry = COT_SCHEDULE.find(s => s.date === t);
-  const cotPast = COT_SCHEDULE.filter(s => s.date < t);
-  const cotNext = cotEntry || (cotPast.length ? COT_SCHEDULE.find(s => s.date > t) : null);
-  const cotDone = COT_SCHEDULE.filter(s => s.date <= t);
-  const cotProg = cotDone.length ? { ep: cotDone[cotDone.length - 1].endPage, pct: Math.round(cotDone[cotDone.length - 1].endPage / COT_TOTAL * 100) } : { ep: 0, pct: 0 };
+  const cotPast  = COT_SCHEDULE.filter(s => s.date < t);
+  const cotNext  = cotEntry || (cotPast.length ? COT_SCHEDULE.find(s => s.date > t) : null);
+  const cotDone  = COT_SCHEDULE.filter(s => s.date <= t);
+  const cotProg  = cotDone.length
+    ? { ep: cotDone[cotDone.length - 1].endPage, pct: Math.round(cotDone[cotDone.length - 1].endPage / COT_TOTAL * 100) }
+    : { ep: 0, pct: 0 };
 
   const lichtEntry = LICHT_SCHEDULE.find(s => s.date === t);
-  const lichtPast = LICHT_SCHEDULE.filter(s => s.date < t);
-  const lichtNext = lichtEntry || (lichtPast.length ? LICHT_SCHEDULE.find(s => s.date > t) : null);
-  const lichtDone = LICHT_SCHEDULE.filter(s => s.date <= t);
-  const lichtProg = lichtDone.length ? { ep: lichtDone[lichtDone.length - 1].endPage, pct: Math.round(lichtDone[lichtDone.length - 1].endPage / LICHT_TOTAL * 100) } : { ep: 46, pct: Math.round(46 / LICHT_TOTAL * 100) };
+  const lichtPast  = LICHT_SCHEDULE.filter(s => s.date < t);
+  const lichtNext  = lichtEntry || (lichtPast.length ? LICHT_SCHEDULE.find(s => s.date > t) : null);
+  const lichtDone  = LICHT_SCHEDULE.filter(s => s.date <= t);
+  const lichtProg  = lichtDone.length
+    ? { ep: lichtDone[lichtDone.length - 1].endPage, pct: Math.round(lichtDone[lichtDone.length - 1].endPage / LICHT_TOTAL * 100) }
+    : { ep: 46, pct: Math.round(46 / LICHT_TOTAL * 100) };
 
   let html = '';
 
@@ -217,83 +224,141 @@ function renderReading() {
 // ── Wellness ──────────────────────────────────────────────────────────────────
 function renderWellness() {
   const soberDays = daysSince(settings.sober_date || '2026-01-11');
-  const streak = parseInt(settings.duolingo_streak) || 691;
+  const streak    = parseInt(settings.duolingo_streak) || 691;
   document.getElementById('el-wellness').innerHTML = [
     { label: 'Alcohol-free days', value: soberDays, sub: `since ${new Date((settings.sober_date || '2026-01-11') + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, cls: 'card-green' },
-    { label: 'Duolingo streak', value: streak + ' days', sub: 'Spanish', cls: 'card-teal' },
+    { label: 'Duolingo streak',   value: streak + ' days', sub: 'Spanish', cls: 'card-teal' },
   ].map(c => `<div class="card ${c.cls}"><div class="card-label">${c.label}</div><div class="card-value">${c.value}</div><div class="card-sub">${c.sub}</div></div>`).join('');
 }
 
-// ── Weather & news from cache ─────────────────────────────────────────────────
-async function loadWeatherNews() {
-  const { data } = await sb.from('brief_cache').select('key,data,fetched_at').in('key', ['weather', 'news']);
-  if (data) {
-    const wRow = data.find(r => r.key === 'weather');
-    const nRow = data.find(r => r.key === 'news');
-    if (wRow) renderWeather(wRow.data, wRow.fetched_at);
-    if (nRow) renderNews(nRow.data, nRow.fetched_at);
-  }
-  if (!data || data.length < 2) {
-    document.getElementById('el-weather').innerHTML = '<div class="loading">No forecast cached yet — hit Refresh</div>';
-    document.getElementById('el-news').innerHTML = '<div class="loading">No headlines cached yet — hit Refresh</div>';
-  }
+// ── Weather — NWS API ─────────────────────────────────────────────────────────
+function conditionToIcon(shortForecast) {
+  const f = (shortForecast || '').toLowerCase();
+  if (f.includes('thunder')) return '⛈️';
+  if (f.includes('snow') || f.includes('blizzard')) return '❄️';
+  if (f.includes('rain') || f.includes('shower') || f.includes('drizzle')) return '🌧️';
+  if (f.includes('sleet') || f.includes('freezing')) return '🌨️';
+  if (f.includes('fog') || f.includes('haze')) return '🌫️';
+  if (f.includes('partly cloudy') || f.includes('partly sunny') || f.includes('mostly cloudy')) return '⛅';
+  if (f.includes('mostly sunny') || f.includes('mostly clear')) return '🌤️';
+  if (f.includes('cloudy') || f.includes('overcast')) return '☁️';
+  if (f.includes('sunny') || f.includes('clear')) return '☀️';
+  return '🌡️';
 }
 
-function renderWeather(weatherData, fetchedAt) {
-  const note = fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · NWS Nashville` : '';
-  document.getElementById('el-weather').innerHTML = `<div class="weather-grid">${weatherData.map(w => `
-    <div class="wd">
-      <div class="wd-day">${w.day}</div>
-      <div class="wd-date">${w.label}</div>
-      <div class="wd-icon">${w.icon}</div>
-      <div class="wd-hi">${w.hi}°F / ${toC(w.hi)}°C</div>
-      <div class="wd-lo">${w.lo}°F / ${toC(w.lo)}°C</div>
-      <div class="wd-cond">${w.cond}</div>
-    </div>`).join('')}</div>`;
-  document.getElementById('weather-note').textContent = note;
-}
-
-function renderNews(newsData, fetchedAt) {
-  const note = fetchedAt ? `Updated ${new Date(fetchedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : '';
-  document.getElementById('el-news').innerHTML = newsData.map(n => `
-    <div class="news-item">
-      <div><span class="news-tag ${n.cat === 'ttrpg' ? 'tag-ttrpg' : 'tag-de'}">${n.cat === 'ttrpg' ? 'TTRPG' : 'Germany'}</span></div>
-      <div class="news-hl">${n.hl}</div>
-      <div class="news-src">${n.src}</div>
-    </div>`).join('');
-  document.getElementById('news-note').textContent = note;
-}
-
-// ── Refresh weather/news via edge function ────────────────────────────────────
-async function refreshWeatherNews() {
-  const btn = document.getElementById('refresh-btn');
-  btn.disabled = true;
-  btn.textContent = '↻ Refreshing...';
-  document.getElementById('el-weather').innerHTML = '<div class="loading">Fetching forecast...</div>';
-  document.getElementById('el-news').innerHTML = '<div class="loading">Fetching headlines...</div>';
+async function fetchWeather() {
   try {
-    const { data, error } = await sb.functions.invoke('fetch-weather-news');
-    if (error) throw error;
-    if (data.weather) renderWeather(data.weather, new Date().toISOString());
-    if (data.news) renderNews(data.news, new Date().toISOString());
+    const res  = await fetch(PROXY + encodeURIComponent(NWS_FORECAST_URL), {
+      headers: { 'User-Agent': 'morning-brief/1.0 (personal dashboard)' }
+    });
+    const json = await res.json();
+    const periods = json.properties.periods;
+
+    const days = periods
+      .filter(p => p.isDaytime)
+      .slice(0, 5)
+      .map(p => {
+        const dt        = new Date(p.startTime);
+        const hiF       = p.temperature;
+        const loFPeriod = periods.find(n => !n.isDaytime && n.number === p.number + 1);
+        const loF       = loFPeriod ? loFPeriod.temperature : null;
+        return {
+          day:   dt.toLocaleDateString('en-US', { weekday: 'short' }),
+          label: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          hi:    hiF,
+          lo:    loF,
+          hiC:   toC(hiF),
+          loC:   loF != null ? toC(loF) : null,
+          cond:  p.shortForecast,
+          icon:  conditionToIcon(p.shortForecast),
+          rain:  p.probabilityOfPrecipitation?.value != null ? p.probabilityOfPrecipitation.value + '%' : '—',
+        };
+      });
+
+    document.getElementById('el-weather').innerHTML = `<div class="weather-grid">${days.map(w => `
+      <div class="wd">
+        <div class="wd-day">${w.day}</div>
+        <div class="wd-date">${w.label}</div>
+        <div class="wd-icon">${w.icon}</div>
+        <div class="wd-hi">${w.hi}°F / ${w.hiC}°C</div>
+        <div class="wd-lo">${w.lo != null ? w.lo + '°F / ' + w.loC + '°C' : '—'}</div>
+        <div class="wd-cond">${w.cond}</div>
+        <div class="wd-cond">Rain: ${w.rain}</div>
+      </div>`).join('')}</div>`;
+    document.getElementById('weather-note').textContent = 'Live · National Weather Service Nashville';
   } catch (e) {
-    document.getElementById('el-weather').innerHTML = '<div class="loading">Refresh failed — try again later</div>';
-    document.getElementById('el-news').innerHTML = '<div class="loading">Refresh failed — try again later</div>';
+    document.getElementById('el-weather').innerHTML = '<div class="loading">Weather unavailable — try refreshing</div>';
+    console.error('Weather fetch error:', e);
   }
-  btn.disabled = false;
-  btn.textContent = '↻ Refresh';
+}
+
+// ── News — RSS feeds ──────────────────────────────────────────────────────────
+function parseRSS(xmlText) {
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(xmlText, 'text/xml');
+  return Array.from(doc.querySelectorAll('item')).slice(0, 8).map(item => {
+    // <link> in RSS is a text node sibling, not an attribute
+    let link = '';
+    const linkEl = item.querySelector('link');
+    if (linkEl) {
+      link = linkEl.textContent?.trim() || linkEl.getAttribute('href') || '';
+    }
+    return {
+      title: item.querySelector('title')?.textContent?.trim() || '',
+      link,
+      date:  item.querySelector('pubDate')?.textContent?.trim() || '',
+    };
+  });
+}
+
+async function fetchNews() {
+  try {
+    const [enwRes, dwRes] = await Promise.all([
+      fetch(PROXY + encodeURIComponent(ENW_RSS_URL)),
+      fetch(PROXY + encodeURIComponent(DW_RSS_URL)),
+    ]);
+
+    const enwItems = parseRSS(await enwRes.text()).slice(0, 5);
+    const dwItems  = parseRSS(await dwRes.text()).slice(0, 5);
+
+    const formatDate = s => {
+      try { return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+      catch { return ''; }
+    };
+
+    const allItems = [
+      ...enwItems.map(n => ({ cat: 'ttrpg', ...n })),
+      ...dwItems.map(n => ({ cat: 'de', ...n })),
+    ];
+
+    document.getElementById('el-news').innerHTML = allItems.map(n => `
+      <div class="news-item">
+        <div><span class="news-tag ${n.cat === 'ttrpg' ? 'tag-ttrpg' : 'tag-de'}">${n.cat === 'ttrpg' ? 'TTRPG' : 'Germany'}</span></div>
+        <div class="news-hl">
+          ${n.link
+            ? `<a href="${n.link}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px solid var(--border);">${n.title}</a>`
+            : n.title}
+        </div>
+        <div class="news-src">${formatDate(n.date)}</div>
+      </div>`).join('');
+
+    document.getElementById('news-note').textContent = 'Live · EN World · Deutsche Welle';
+  } catch (e) {
+    document.getElementById('el-news').innerHTML = '<div class="loading">News unavailable — try refreshing</div>';
+    console.error('News fetch error:', e);
+  }
 }
 
 // ── Log form ──────────────────────────────────────────────────────────────────
 function onFieldChange() {
   const f = document.getElementById('log-field').value;
-  document.getElementById('log-num').style.display = f === 'soberDate' ? 'none' : '';
+  document.getElementById('log-num').style.display  = f === 'soberDate' ? 'none' : '';
   document.getElementById('log-date').style.display = f === 'soberDate' ? '' : 'none';
   if (f === 'soberDate') document.getElementById('log-date').value = settings.sober_date || '';
 }
 
 async function doLog() {
-  const f = document.getElementById('log-field').value;
+  const f  = document.getElementById('log-field').value;
   const ok = document.getElementById('log-ok');
 
   if (f === 'weight') {
@@ -326,7 +391,7 @@ async function doLog() {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 async function main() {
-  document.getElementById('el-date').textContent = fmtDate(today());
+  document.getElementById('el-date').textContent  = fmtDate(today());
   document.getElementById('el-greet').textContent = greeting();
 
   await loadData();
@@ -334,7 +399,10 @@ async function main() {
   drawChart();
   renderReading();
   renderWellness();
-  await loadWeatherNews();
+
+  // Weather and news load independently in parallel
+  fetchWeather();
+  fetchNews();
 }
 
 main();
