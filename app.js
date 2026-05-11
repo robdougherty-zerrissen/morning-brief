@@ -4,8 +4,9 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── External feed URLs ────────────────────────────────────────────────────────
-// allorigins wraps any URL and returns JSON: { contents: "...", status: {...} }
-const PROXY = 'https://api.allorigins.win/get?url=';
+// NWS sends Access-Control-Allow-Origin: * so no proxy needed for weather.
+// corsproxy.io returns the raw response body for RSS feeds.
+const CORS_PROXY = 'https://corsproxy.io/?';
 const NWS_FORECAST_URL = 'https://api.weather.gov/gridpoints/OHX/53,71/forecast';
 const DW_RSS_URL  = 'https://rss.dw.com/rdf/rss-en-ger';
 const ENW_RSS_URL = 'https://www.enworld.org/ewr-porta/index.rss';
@@ -249,9 +250,8 @@ function conditionToIcon(shortForecast) {
 
 async function fetchWeather() {
   try {
-    const res    = await fetch(PROXY + encodeURIComponent(NWS_FORECAST_URL));
-    const outer  = await res.json();
-    const json   = JSON.parse(outer.contents);
+    const res     = await fetch(NWS_FORECAST_URL);
+    const json    = await res.json();
     const periods = json.properties.periods;
 
     const days = periods
@@ -314,14 +314,14 @@ function parseRSS(xmlText) {
 async function fetchNews() {
   try {
     const [enwRes, dwRes] = await Promise.all([
-      fetch(PROXY + encodeURIComponent(ENW_RSS_URL)),
-      fetch(PROXY + encodeURIComponent(DW_RSS_URL)),
+      fetch(CORS_PROXY + encodeURIComponent(ENW_RSS_URL)),
+      fetch(CORS_PROXY + encodeURIComponent(DW_RSS_URL)),
     ]);
 
     const enwOuter = await enwRes.json();
     const dwOuter  = await dwRes.json();
-    const enwItems = parseRSS(enwOuter.contents).slice(0, 5);
-    const dwItems  = parseRSS(dwOuter.contents).slice(0, 5);
+    const enwItems = parseRSS(await enwRes.text()).slice(0, 5);
+    const dwItems  = parseRSS(await dwRes.text()).slice(0, 5);
 
     const formatDate = s => {
       try { return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
@@ -389,6 +389,13 @@ async function doLog() {
 
   ok.style.display = 'block';
   setTimeout(() => ok.style.display = 'none', 2000);
+}
+
+async function refreshWeatherNews() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  await Promise.all([fetchWeather(), fetchNews()]);
+  btn.disabled = false;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
