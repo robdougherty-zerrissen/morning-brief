@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Morning Brief</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f9f9f8;
+      --bg2: #f1f0ee;
+      --bg3: #e8e7e4;
+      --text: #1a1a18;
+      --text2: #5a5a54;
+      --text3: #9a9a92;
+      --border: #e0dfd9;
+      --amber: #BA7517;
+      --green: #4a7c1f;
+      --teal: #1a7a5a;
+      --purple: #6b3fa0;
+      --red: #c0392b;
+      --blue: #2563b0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #141412;
+        --bg2: #1e1e1b;
+        --bg3: #28281f;
+        --text: #f0efe8;
+        --text2: #a8a89a;
+        --text3: #68685a;
+        --border: #2e2e28;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.5; }
+    .container { max-width: 680px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .brief-meta { font-size: 12px; color: var(--text3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .brief-greeting { font-size: 24px; font-weight: 500; color: var(--text); margin-bottom: 2rem; }
+    .section { margin-bottom: 2rem; }
+    .sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .sec-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+    .refresh-btn { font-size: 11px; color: var(--text3); background: none; border: 1px solid var(--border); border-radius: 5px; padding: 3px 10px; cursor: pointer; transition: all 0.15s; }
+    .refresh-btn:hover { color: var(--text2); border-color: var(--text3); }
+    .refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; }
+    .card { background: var(--bg2); border-radius: 10px; padding: 13px 15px; border-left: 3px solid transparent; }
+    .card-label { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+    .card-value { font-size: 22px; font-weight: 500; color: var(--text); }
+    .card-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    .card-amber { border-color: var(--amber); }
+    .card-green { border-color: var(--green); }
+    .card-teal { border-color: var(--teal); }
+    .card-purple { border-color: var(--purple); }
+    .workout-box { background: var(--bg2); border-radius: 10px; padding: 14px 16px; }
+    .workout-title { font-size: 18px; font-weight: 500; margin-bottom: 2px; }
+    .workout-sub { font-size: 12px; color: var(--text3); margin-bottom: 12px; }
+    .ex-list { border-top: 1px solid var(--border); }
+    .ex-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); gap: 12px; }
+    .ex-row:last-child { border-bottom: none; }
+    .ex-name { font-size: 14px; font-weight: 500; }
+    .ex-note { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .ex-detail { font-size: 13px; color: var(--text2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    canvas { display: block; width: 100%; border-radius: 8px; }
+    .chart-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--text3); }
+    .chart-legend span { display: flex; align-items: center; gap: 5px; }
+    .legend-sq { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .legend-dash { width: 14px; height: 2px; display: inline-block; background: var(--green); }
+    .reading-box { background: var(--bg2); border-radius: 10px; padding: 13px 15px; margin-bottom: 8px; }
+    .reading-book { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+    .reading-chap { font-size: 15px; font-weight: 500; margin-bottom: 2px; }
+    .reading-pages { font-size: 12px; color: var(--text2); }
+    .progress-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+    .bar-wrap { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+    .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .weather-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .wd { background: var(--bg2); border-radius: 10px; padding: 10px 6px; text-align: center; }
+    .wd-day { font-size: 11px; font-weight: 600; color: var(--text2); }
+    .wd-date { font-size: 10px; color: var(--text3); margin-bottom: 5px; }
+    .wd-icon { font-size: 20px; margin-bottom: 4px; }
+    .wd-hi { font-size: 13px; font-weight: 500; }
+    .wd-lo { font-size: 11px; color: var(--text3); margin-top: 1px; }
+    .wd-cond { font-size: 9px; color: var(--text3); margin-top: 3px; line-height: 1.3; }
+    .news-item { padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .news-item:last-child { border-bottom: none; }
+    .news-tag { display: inline-block; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .tag-ttrpg { background: #dbeafe; color: #1d4ed8; }
+    .tag-de { background: #dcfce7; color: #166534; }
+    @media (prefers-color-scheme: dark) {
+      .tag-ttrpg { background: #1e3a5f; color: #93c5fd; }
+      .tag-de { background: #14532d; color: #86efac; }
+    }
+    .news-hl { font-size: 14px; line-height: 1.4; }
+    .news-src { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .log-form { background: var(--bg2); border-radius: 10px; padding: 14px 16px; }
+    .log-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .log-form select, .log-form input { font-size: 14px; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: inherit; }
+    .log-form select { min-width: 175px; }
+    .log-form input[type=number] { width: 100px; }
+    .log-form input[type=date] { display: none; }
+    .log-btn { font-size: 14px; padding: 7px 18px; border-radius: 7px; border: none; background: var(--text); color: var(--bg); cursor: pointer; font-family: inherit; font-weight: 500; }
+    .log-btn:hover { opacity: 0.85; }
+    .log-ok { font-size: 12px; color: var(--green); margin-top: 8px; display: none; }
+    .note { font-size: 11px; color: var(--text3); margin-top: 6px; }
+    .catchup { font-size: 11px; color: var(--red); margin-top: 3px; }
+    .loading { font-size: 13px; color: var(--text3); font-style: italic; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="brief-meta" id="el-date"></div>
+  <div class="brief-greeting" id="el-greet"></div>
+
+  <!-- WORKOUT -->
+  <div class="section">
+    <div class="sec-label">Today's workout</div>
+    <div id="el-workout"><div class="loading">Loading...</div></div>
+  </div>
+
+  <!-- WEIGHT -->
+  <div class="section">
+    <div class="sec-label">Weight trend</div>
+    <div class="stat-row">
+      <div class="card card-amber">
+        <div class="card-label">Current weight</div>
+        <div class="card-value" id="w-current">—</div>
+        <div class="card-sub" id="w-goal-sub">Goal: 195 lbs</div>
+      </div>
+      <div class="card card-green">
+        <div class="card-label">Lost so far</div>
+        <div class="card-value" id="w-lost">—</div>
+        <div class="card-sub">from 225 lbs starting weight</div>
+      </div>
+    </div>
+    <canvas id="wt-chart" height="200"></canvas>
+    <div class="chart-legend">
+      <span><span class="legend-sq" style="background:var(--amber)"></span>Weight</span>
+      <span><span class="legend-dash"></span>Goal (195 lbs)</span>
+    </div>
+  </div>
+
+  <!-- READING -->
+  <div class="section">
+    <div class="sec-label">Reading</div>
+    <div id="el-reading"><div class="loading">Loading...</div></div>
+  </div>
+
+  <!-- WELLNESS -->
+  <div class="section">
+    <div class="sec-label">Wellness</div>
+    <div class="cards" id="el-wellness"></div>
+  </div>
+
+  <!-- WEATHER -->
+  <div class="section">
+    <div class="sec-head">
+      <div class="sec-label">5-day forecast — Nashville</div>
+      <button class="refresh-btn" id="refresh-btn" onclick="refreshWeatherNews()">↻ Refresh</button>
+    </div>
+    <div id="el-weather"><div class="loading">Loading...</div></div>
+    <div class="note" id="weather-note"></div>
+  </div>
+
+  <!-- NEWS -->
+  <div class="section">
+    <div class="sec-label">News — TTRPGs &amp; Germany</div>
+    <div id="el-news"><div class="loading">Loading...</div></div>
+    <div class="note" id="news-note"></div>
+  </div>
+
+  <!-- LOG -->
+  <div class="section">
+    <div class="sec-label">Log data</div>
+    <div class="log-form">
+      <div class="log-row">
+        <select id="log-field" onchange="onFieldChange()">
+          <option value="weight">Weight (lbs)</option>
+          <option value="duolingo">Duolingo streak (days)</option>
+          <option value="soberDate">Sober since (date)</option>
+        </select>
+        <input type="number" id="log-num" placeholder="Value" step="0.1" min="0">
+        <input type="date" id="log-date">
+        <button class="log-btn" onclick="doLog()">Log</button>
+      </div>
+      <div class="log-ok" id="log-ok">✓ Saved</div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
