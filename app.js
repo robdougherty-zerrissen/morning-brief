@@ -3,11 +3,12 @@ const SUPABASE_URL = 'https://oejfkgozxswpvjujbnkg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9lamZrZ296eHN3cHZqdWpibmtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NjUzMjEsImV4cCI6MjA5MzI0MTMyMX0.oyUR0kYcNogW3NF6E98hKFWrk9Ac4HzUwsq89SUSSqQ';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ── External feed URLs (via CORS proxy) ──────────────────────────────────────
-const PROXY = 'https://corsproxy.io/?';
+// ── External feed URLs ────────────────────────────────────────────────────────
+// allorigins wraps any URL and returns JSON: { contents: "...", status: {...} }
+const PROXY = 'https://api.allorigins.win/get?url=';
 const NWS_FORECAST_URL = 'https://api.weather.gov/gridpoints/OHX/53,71/forecast';
 const DW_RSS_URL  = 'https://rss.dw.com/rdf/rss-en-ger';
-const ENW_RSS_URL = 'https://www.enworld.org/forums/-/index.rss';
+const ENW_RSS_URL = 'https://www.enworld.org/ewr-porta/index.rss';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GOAL_WEIGHT  = 195;
@@ -248,10 +249,9 @@ function conditionToIcon(shortForecast) {
 
 async function fetchWeather() {
   try {
-    const res  = await fetch(PROXY + encodeURIComponent(NWS_FORECAST_URL), {
-      headers: { 'User-Agent': 'morning-brief/1.0 (personal dashboard)' }
-    });
-    const json = await res.json();
+    const res    = await fetch(PROXY + encodeURIComponent(NWS_FORECAST_URL));
+    const outer  = await res.json();
+    const json   = JSON.parse(outer.contents);
     const periods = json.properties.periods;
 
     const days = periods
@@ -318,8 +318,10 @@ async function fetchNews() {
       fetch(PROXY + encodeURIComponent(DW_RSS_URL)),
     ]);
 
-    const enwItems = parseRSS(await enwRes.text()).slice(0, 5);
-    const dwItems  = parseRSS(await dwRes.text()).slice(0, 5);
+    const enwOuter = await enwRes.json();
+    const dwOuter  = await dwRes.json();
+    const enwItems = parseRSS(enwOuter.contents).slice(0, 5);
+    const dwItems  = parseRSS(dwOuter.contents).slice(0, 5);
 
     const formatDate = s => {
       try { return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
