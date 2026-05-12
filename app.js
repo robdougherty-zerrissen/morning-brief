@@ -6,7 +6,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ── External feed URLs ────────────────────────────────────────────────────────
 const NWS_FORECAST_URL = 'https://api.weather.gov/gridpoints/OHX/53,71/forecast';
 const DW_RSS_URL  = 'https://rss.dw.com/rdf/rss-en-ger';
-const ENW_RSS_URL = 'https://www.enworld.org/articles/index.rss';
+const ENW_RSS_URL = 'https://www.enworld.org/forums/-/index.rss';
 
 // CORS proxies tried in order; each returns raw response text
 const RSS_PROXIES = [
