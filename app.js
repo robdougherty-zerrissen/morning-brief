@@ -5,11 +5,11 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── External feed URLs ────────────────────────────────────────────────────────
 // NWS sends Access-Control-Allow-Origin: * so no proxy needed for weather.
-// corsproxy.io returns the raw response body for RSS feeds.
-const CORS_PROXY = 'https://corsproxy.io/?';
+// allorigins wraps any URL and returns JSON: { contents: "...", status: {...} }
+const ALLORIGINS = 'https://api.allorigins.win/get?url=';
 const NWS_FORECAST_URL = 'https://api.weather.gov/gridpoints/OHX/53,71/forecast';
 const DW_RSS_URL  = 'https://rss.dw.com/rdf/rss-en-ger';
-const ENW_RSS_URL = 'https://www.enworld.org/ewr-porta/index.rss';
+const ENW_RSS_URL = 'https://www.enworld.org/articles/index.rss';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GOAL_WEIGHT  = 195;
@@ -311,17 +311,18 @@ function parseRSS(xmlText) {
   });
 }
 
+async function fetchFeed(url) {
+  const res  = await fetch(ALLORIGINS + encodeURIComponent(url));
+  const data = await res.json();
+  return data.contents ? parseRSS(data.contents) : [];
+}
+
 async function fetchNews() {
   try {
-    const [enwRes, dwRes] = await Promise.all([
-      fetch(CORS_PROXY + encodeURIComponent(ENW_RSS_URL)),
-      fetch(CORS_PROXY + encodeURIComponent(DW_RSS_URL)),
+    const [enwItems, dwItems] = await Promise.all([
+      fetchFeed(ENW_RSS_URL).then(items => items.slice(0, 5)).catch(() => []),
+      fetchFeed(DW_RSS_URL).then(items => items.slice(0, 5)).catch(() => []),
     ]);
-
-    const enwOuter = await enwRes.json();
-    const dwOuter  = await dwRes.json();
-    const enwItems = parseRSS(await enwRes.text()).slice(0, 5);
-    const dwItems  = parseRSS(await dwRes.text()).slice(0, 5);
 
     const formatDate = s => {
       try { return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
@@ -332,6 +333,11 @@ async function fetchNews() {
       ...enwItems.map(n => ({ cat: 'ttrpg', ...n })),
       ...dwItems.map(n => ({ cat: 'de', ...n })),
     ];
+
+    if (!allItems.length) {
+      document.getElementById('el-news').innerHTML = '<div class="loading">News unavailable — try refreshing</div>';
+      return;
+    }
 
     document.getElementById('el-news').innerHTML = allItems.map(n => `
       <div class="news-item">
@@ -391,6 +397,7 @@ async function doLog() {
   setTimeout(() => ok.style.display = 'none', 2000);
 }
 
+// ── Refresh button ────────────────────────────────────────────────────────────
 async function refreshWeatherNews() {
   const btn = document.getElementById('refresh-btn');
   btn.disabled = true;
