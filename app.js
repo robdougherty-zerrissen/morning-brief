@@ -316,7 +316,8 @@ function parseRSS(xmlText) {
     return {
       title: item.querySelector('title')?.textContent?.trim() || '',
       link,
-      date:  item.querySelector('pubDate')?.textContent?.trim() || '',
+      date:  item.querySelector('pubDate')?.textContent?.trim() ||
+             item.querySelector('date')?.textContent?.trim() || '',
     };
   });
 }
@@ -327,7 +328,8 @@ async function fetchFeed(url) {
       const res = await fetch(proxy(url), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) continue;
       const text = await res.text();
-      if (text) return parseRSS(text);
+      const items = text ? parseRSS(text) : [];
+      if (items.length > 0) return items;
     } catch {}
   }
   return [];
@@ -341,8 +343,12 @@ async function fetchNews() {
     ]);
 
     const formatDate = s => {
-      try { return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-      catch { return ''; }
+      if (!s) return '';
+      try {
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      } catch { return ''; }
     };
 
     const allItems = [
