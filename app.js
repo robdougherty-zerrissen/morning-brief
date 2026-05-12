@@ -7,12 +7,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const NWS_FORECAST_URL = 'https://api.weather.gov/gridpoints/OHX/53,71/forecast';
 const DW_RSS_URL  = 'https://rss.dw.com/rdf/rss-en-ger';
 const ENW_RSS_URL = 'https://www.enworld.org/forums/-/index.rss';
-
-// CORS proxies tried in order; each returns raw response text
-const RSS_PROXIES = [
-  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-];
+// rss2json fetches feeds server-side and returns JSON with CORS headers
+const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GOAL_WEIGHT  = 195;
@@ -303,36 +299,17 @@ async function fetchWeather() {
 }
 
 // ── News — RSS feeds ──────────────────────────────────────────────────────────
-function parseRSS(xmlText) {
-  const parser = new DOMParser();
-  const doc    = parser.parseFromString(xmlText, 'text/xml');
-  return Array.from(doc.querySelectorAll('item')).slice(0, 8).map(item => {
-    // <link> in RSS is a text node sibling, not an attribute
-    let link = '';
-    const linkEl = item.querySelector('link');
-    if (linkEl) {
-      link = linkEl.textContent?.trim() || linkEl.getAttribute('href') || '';
-    }
-    return {
-      title: item.querySelector('title')?.textContent?.trim() || '',
-      link,
-      date:  item.querySelector('pubDate')?.textContent?.trim() ||
-             item.querySelector('date')?.textContent?.trim() || '',
-    };
-  });
-}
-
 async function fetchFeed(url) {
-  for (const proxy of RSS_PROXIES) {
-    try {
-      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) continue;
-      const text = await res.text();
-      const items = text ? parseRSS(text) : [];
-      if (items.length > 0) return items;
-    } catch {}
-  }
-  return [];
+  const res  = await fetch(RSS2JSON + encodeURIComponent(url), { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) return [];
+  const data = await res.json();
+  if (data.status !== 'ok' || !data.items?.length) return [];
+  return data.items.map(item => ({
+    title: item.title || '',
+    link:  item.link  || '',
+    // rss2json returns "YYYY-MM-DD HH:MM:SS"; add T so Date parses it correctly
+    date:  item.pubDate ? item.pubDate.replace(' ', 'T') : '',
+  }));
 }
 
 async function fetchNews() {
