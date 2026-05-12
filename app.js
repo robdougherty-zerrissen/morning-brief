@@ -4,12 +4,15 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── External feed URLs ────────────────────────────────────────────────────────
-// NWS sends Access-Control-Allow-Origin: * so no proxy needed for weather.
-// allorigins wraps any URL and returns JSON: { contents: "...", status: {...} }
-const ALLORIGINS = 'https://api.allorigins.win/get?url=';
 const NWS_FORECAST_URL = 'https://api.weather.gov/gridpoints/OHX/53,71/forecast';
 const DW_RSS_URL  = 'https://rss.dw.com/rdf/rss-en-ger';
 const ENW_RSS_URL = 'https://www.enworld.org/articles/index.rss';
+
+// CORS proxies tried in order; each returns raw response text
+const RSS_PROXIES = [
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GOAL_WEIGHT  = 195;
@@ -250,8 +253,15 @@ function conditionToIcon(shortForecast) {
 
 async function fetchWeather() {
   try {
-    const res     = await fetch(NWS_FORECAST_URL);
-    const json    = await res.json();
+    let json;
+    try {
+      const res = await fetch(NWS_FORECAST_URL, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error('NWS ' + res.status);
+      json = await res.json();
+    } catch {
+      const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(NWS_FORECAST_URL)}`, { signal: AbortSignal.timeout(8000) });
+      json = await res.json();
+    }
     const periods = json.properties.periods;
 
     const days = periods
@@ -312,9 +322,15 @@ function parseRSS(xmlText) {
 }
 
 async function fetchFeed(url) {
-  const res  = await fetch(ALLORIGINS + encodeURIComponent(url));
-  const data = await res.json();
-  return data.contents ? parseRSS(data.contents) : [];
+  for (const proxy of RSS_PROXIES) {
+    try {
+      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (text) return parseRSS(text);
+    } catch {}
+  }
+  return [];
 }
 
 async function fetchNews() {
